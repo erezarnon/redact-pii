@@ -14,7 +14,7 @@ const genericName = new RegExp('( ?(([A-Z][a-z]+)|([A-Z]\\.)))+([,.]|[,.]?$)', '
 const wellKnownNames = new RegExp('\\b(\\s*)(\\s*(' + _wellKnownNames.join('|') + '))+\\b', 'gim');
 
 export class NameRedactor implements ISyncRedactor {
-  constructor(private replaceWith = 'PERSON_NAME') {}
+  constructor(private replaceWith: string | ((match: string) => string) = 'PERSON_NAME') {}
 
   redact(textToRedact: string) {
     greetingOrClosing.lastIndex = 0;
@@ -27,14 +27,18 @@ export class NameRedactor implements ISyncRedactor {
         let suffix = genericNameMatch[5] === null ? '' : genericNameMatch[5];
         textToRedact =
           textToRedact.slice(0, genericNameMatch.index) +
-          this.replaceWith +
+          (typeof this.replaceWith === 'string' ? this.replaceWith : this.replaceWith(genericNameMatch[0])) +
           suffix +
           textToRedact.slice(genericNameMatch.index + genericNameMatch[0].length);
       }
       greetingOrClosingMatch = greetingOrClosing.exec(textToRedact);
     }
 
-    textToRedact = textToRedact.replace(wellKnownNames, '$1' + this.replaceWith);
+    if (typeof this.replaceWith === 'string') {
+      textToRedact = textToRedact.replace(wellKnownNames, '$1' + this.replaceWith);
+    } else if (this.replaceWith instanceof Function) {
+      textToRedact = textToRedact.replace(wellKnownNames, (match, ...args) => args[0] + (this.replaceWith as typeof this.replaceWith & Function)(match));
+    }
 
     return textToRedact;
   }
